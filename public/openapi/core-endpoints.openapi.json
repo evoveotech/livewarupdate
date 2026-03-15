@@ -1,0 +1,237 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Core API Endpoints",
+    "version": "1.0.0",
+    "description": "Non-RPC API endpoints used by the World Monitor webapp: bootstrap, RSS proxy, health, geo, and utilities."
+  },
+  "servers": [
+    { "url": "/", "description": "Same origin (relative)" }
+  ],
+  "paths": {
+    "/api/bootstrap": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "Bootstrap data",
+        "description": "Bulk hydration endpoint. Returns cached data for multiple keys in one request. Used for fast initial page load.",
+        "parameters": [
+          {
+            "name": "tier",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["fast", "slow"] },
+            "description": "Predefined tier: fast (earthquakes, markets, etc.) or slow (BIS, minerals, etc.)"
+          },
+          {
+            "name": "keys",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Comma-separated keys (e.g. marketQuotes, bisPolicy). Overrides tier when present."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bootstrap data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "object", "additionalProperties": true },
+                    "missing": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "Health check",
+        "description": "Returns status of all bootstrap keys and standalone data sources.",
+        "responses": {
+          "200": {
+            "description": "Health status per key",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
+    },
+    "/api/rss-proxy": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "RSS proxy",
+        "description": "Proxies RSS/Atom feeds. Only allowlisted domains are permitted.",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "uri" },
+            "description": "Feed URL (must be in allowlist)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RSS/Atom XML",
+            "content": { "application/xml": { "schema": { "type": "string" } } }
+          },
+          "403": { "description": "Domain not allowed" }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "API version",
+        "description": "Returns API version info. No auth required.",
+        "responses": {
+          "200": {
+            "description": "Version info",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
+    },
+    "/api/geo": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "Geolocation",
+        "description": "Resolves IP or coordinates to country/region.",
+        "parameters": [
+          { "name": "ip", "in": "query", "schema": { "type": "string" } },
+          { "name": "lat", "in": "query", "schema": { "type": "number" } },
+          { "name": "lon", "in": "query", "schema": { "type": "number" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Geo result",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
+    },
+    "/api/countries-geojson": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "Countries GeoJSON",
+        "description": "Returns GeoJSON for country boundaries (proxied from maps.worldmonitor.app).",
+        "responses": {
+          "200": {
+            "description": "GeoJSON FeatureCollection",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
+    },
+    "/api/telegram-feed": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "Telegram feed",
+        "description": "Proxies Telegram channel posts. Requires API key for some channels.",
+        "parameters": [
+          { "name": "channel", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Feed items" }
+        }
+      }
+    },
+    "/api/polymarket": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "Polymarket markets",
+        "description": "Returns prediction market data from Polymarket Gamma API.",
+        "parameters": [
+          { "name": "endpoint", "in": "query", "schema": { "type": "string", "default": "markets" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Markets or events" }
+        }
+      }
+    },
+    "/api/ais-snapshot": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "AIS snapshot",
+        "description": "Returns current AIS vessel positions (maritime tracking).",
+        "responses": {
+          "200": { "description": "Vessel positions" }
+        }
+      }
+    },
+    "/api/gpsjam": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "GPS jamming",
+        "description": "Returns GPS interference/jamming data.",
+        "responses": {
+          "200": { "description": "GPS jam zones" }
+        }
+      }
+    },
+    "/api/oref-alerts": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "OREF alerts",
+        "description": "Israel civil defense siren alerts (Hebrew→English).",
+        "parameters": [
+          { "name": "history", "in": "query", "schema": { "type": "string" }, "description": "e.g. 24h for 24h history" }
+        ],
+        "responses": {
+          "200": { "description": "Alerts" }
+        }
+      }
+    },
+    "/api/reverse-geocode": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "Reverse geocode",
+        "description": "Converts lat/lon to place name.",
+        "parameters": [
+          { "name": "lat", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "lon", "in": "query", "required": true, "schema": { "type": "number" } }
+        ],
+        "responses": {
+          "200": { "description": "Place info" }
+        }
+      }
+    },
+    "/api/military-flights": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "Military flights",
+        "description": "Returns military ADS-B flight data.",
+        "responses": {
+          "200": { "description": "Flight data" }
+        }
+      }
+    },
+    "/api/satellites": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "Satellites TLE",
+        "description": "Two-line element data for tracked satellites.",
+        "responses": {
+          "200": { "description": "TLE data" }
+        }
+      }
+    },
+    "/api/youtube/live": {
+      "get": {
+        "tags": ["Core"],
+        "summary": "YouTube live",
+        "description": "Resolves YouTube channel to current live video ID.",
+        "parameters": [
+          { "name": "channel", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Video ID or null" }
+        }
+      }
+    }
+  }
+}

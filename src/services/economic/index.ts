@@ -558,10 +558,14 @@ export async function fetchBisData(): Promise<BisData> {
       hEer?.rates?.length ? Promise.resolve(hEer) : bisEerBreaker.execute(() => client.getBisExchangeRates({}, { signal: AbortSignal.timeout(20_000) }), emptyBisEerFallback),
       hCredit?.entries?.length ? Promise.resolve(hCredit) : bisCreditBreaker.execute(() => client.getBisCredit({}, { signal: AbortSignal.timeout(20_000) }), emptyBisCreditFallback),
     ]);
+    // Normalize: api.worldmonitor.app fallback returns combined { policy, exchange, credit } per endpoint
+    const policyRates = (policy.rates ?? (policy as { policy?: { rates?: BisPolicyRate[] } }).policy?.rates ?? []) as BisPolicyRate[];
+    const exchangeRates = (eer.rates ?? (eer as { exchange?: { rates?: BisExchangeRate[] } }).exchange?.rates ?? []) as BisExchangeRate[];
+    const creditToGdp = (credit.entries ?? (credit as { credit?: { entries?: BisCreditToGdp[] } }).credit?.entries ?? []) as BisCreditToGdp[];
     return {
-      policyRates: policy.rates ?? [],
-      exchangeRates: eer.rates ?? [],
-      creditToGdp: credit.entries ?? [],
+      policyRates,
+      exchangeRates,
+      creditToGdp,
       fetchedAt: new Date(),
     };
   } catch {

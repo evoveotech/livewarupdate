@@ -111,7 +111,7 @@ export function getApiBaseUrl(): string {
   return `http://127.0.0.1:${getLocalApiPort()}`;
 }
 
-function isWorldMonitorWebHost(hostname: string): boolean {
+export function isWorldMonitorWebHost(hostname: string): boolean {
   return hostname === 'worldmonitor.app'
     || hostname === 'www.worldmonitor.app'
     || hostname.endsWith('.worldmonitor.app');
@@ -130,8 +130,9 @@ export function getConfiguredWebApiBaseUrl(): string {
     return '';
   }
 
-  const hostname = window.location?.hostname ?? '';
-  if (!isWorldMonitorWebHost(hostname)) {
+  // On custom domains or localhost: use same-origin /api/* (avoids CORS, requires API deployed with site)
+  const h = window.location?.hostname ?? '';
+  if (h === 'localhost' || h === '127.0.0.1' || !isWorldMonitorWebHost(h)) {
     return '';
   }
 
@@ -139,7 +140,15 @@ export function getConfiguredWebApiBaseUrl(): string {
 }
 
 export function getCanonicalApiOrigin(): string {
-  return getConfiguredWebApiBaseUrl() || DEFAULT_WEB_API_URL;
+  const base = getConfiguredWebApiBaseUrl();
+  if (base) return base;
+  if (typeof window !== 'undefined') {
+    const h = window.location?.hostname ?? '';
+    if (h === 'localhost' || h === '127.0.0.1' || !isWorldMonitorWebHost(h)) {
+      return `${window.location.origin}`;
+    }
+  }
+  return DEFAULT_WEB_API_URL;
 }
 
 export function getRemoteApiBaseUrl(): string {
@@ -155,6 +164,14 @@ export function getRemoteApiBaseUrl(): string {
 
   const fromHosts = DEFAULT_REMOTE_HOSTS[SITE_VARIANT] ?? DEFAULT_REMOTE_HOSTS.full ?? '';
   if (fromHosts) return fromHosts;
+
+  // Custom domain or localhost: same-origin
+  if (typeof window !== 'undefined') {
+    const h = window.location?.hostname ?? '';
+    if (h === 'localhost' || h === '127.0.0.1' || !isWorldMonitorWebHost(h)) {
+      return `${window.location.origin}`;
+    }
+  }
 
   // Desktop builds may not set VITE_WS_API_URL; default to production.
   if (isDesktopRuntime()) return 'https://worldmonitor.app';
@@ -693,6 +710,78 @@ function isAllowedRedirectTarget(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+const CLOUD_API_FALLBACK_ORIGIN = 'https://api.worldmonitor.app';
+
+function shouldFallbackToCloudApi(): boolean {
+  if (isDesktopRuntime() || typeof window === 'undefined') return false;
+  // When same-origin API is used (custom domain or localhost), enable fallback on 404/fail
+  return getConfiguredWebApiBaseUrl() === '';
+}
+
+/**
+ * For custom domains and localhost: try same-origin /api/* first, then fall back to
+ * api.worldmonitor.app on 404, 5xx, or network error. Ensures the site works when
+ * the API is not deployed with the static build (e.g. static-only hosting).
+ */
+export function installCustomDomainApiFallback(): void {
+  if (!shouldFallbackToCloudApi() || (window as unknown as Record<string, unknown>).__wmCustomDomainFallbackPatched) {
+    return;
+  }
+
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    let pathWithQuery: string;
+    try {
+      const parsed = new URL(url, window.location.origin);
+      if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith('/api/')) {
+        return nativeFetch(input, init);
+      }
+      pathWithQuery = `${parsed.pathname}${parsed.search}`;
+    } catch {
+      return nativeFetch(input, init);
+    }
+
+    // Local-only endpoints must not fall back to cloud
+    if (pathWithQuery.startsWith('/api/local-')) {
+      return nativeFetch(input, init);
+    }
+
+    try {
+      const resp = await nativeFetch(input, init);
+      const fallbackStatuses = [404, 405, 502, 503, 504];
+      if (resp.ok || !fallbackStatuses.includes(resp.status)) {
+        return resp;
+      }
+      // Same-origin failed with fallback-able status → try cloud
+      const cloudUrl = `${CLOUD_API_FALLBACK_ORIGIN}${pathWithQuery}`;
+      const cloudHeaders = new Headers(init?.headers);
+      if (KEYED_CLOUD_API_PATTERN.test(pathWithQuery)) {
+        try {
+          const { getRuntimeConfigSnapshot } = await import('@/services/runtime-config');
+          const wmKeyValue = getRuntimeConfigSnapshot().secrets['WORLDMONITOR_API_KEY']?.value;
+          if (wmKeyValue) cloudHeaders.set('X-WorldMonitor-Key', wmKeyValue);
+        } catch { /* no key */ }
+      }
+      return nativeFetch(cloudUrl, { ...init, headers: cloudHeaders });
+    } catch (err) {
+      // Network error → try cloud
+      const cloudUrl = `${CLOUD_API_FALLBACK_ORIGIN}${pathWithQuery}`;
+      const cloudHeaders = new Headers(init?.headers);
+      if (KEYED_CLOUD_API_PATTERN.test(pathWithQuery)) {
+        try {
+          const { getRuntimeConfigSnapshot } = await import('@/services/runtime-config');
+          const wmKeyValue = getRuntimeConfigSnapshot().secrets['WORLDMONITOR_API_KEY']?.value;
+          if (wmKeyValue) cloudHeaders.set('X-WorldMonitor-Key', wmKeyValue);
+        } catch { /* no key */ }
+      }
+      return nativeFetch(cloudUrl, { ...init, headers: cloudHeaders });
+    }
+  };
+
+  (window as unknown as Record<string, unknown>).__wmCustomDomainFallbackPatched = true;
 }
 
 export function installWebApiRedirect(): void {

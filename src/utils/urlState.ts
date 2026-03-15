@@ -135,6 +135,7 @@ export function buildMapUrl(
     layers: MapLayers;
     country?: string;
     expanded?: boolean;
+    variant?: string;
   }
 ): string {
   const url = new URL(baseUrl);
@@ -158,6 +159,10 @@ export function buildMapUrl(
 
   if (state.expanded) {
     params.set('expanded', '1');
+  }
+
+  if (state.variant && state.variant !== 'full') {
+    params.set('variant', state.variant);
   }
 
   url.search = params.toString();

@@ -1,4 +1,5 @@
 import type { FeatureCollection, Geometry, GeoJsonProperties, Position } from 'geojson';
+import { toApiUrl } from './runtime';
 
 interface IndexedCountryGeometry {
   code: string;
@@ -12,7 +13,13 @@ interface CountryHit {
   name: string;
 }
 
-const COUNTRY_GEOJSON_URL = 'https://maps.worldmonitor.app/countries.geojson';
+const COUNTRY_GEOJSON_DIRECT = 'https://maps.worldmonitor.app/countries.geojson';
+
+function getCountryGeojsonUrl(): string {
+  if (typeof window === 'undefined') return COUNTRY_GEOJSON_DIRECT;
+  // Use API proxy: toApiUrl returns full URL when api base set, or path (same-origin) when custom domain/localhost
+  return toApiUrl('/api/countries-geojson') || COUNTRY_GEOJSON_DIRECT;
+}
 
 /** Optional higher-resolution boundary overrides sourced from Natural Earth (served from R2 CDN). */
 const COUNTRY_OVERRIDES_URL = 'https://maps.worldmonitor.app/country-boundary-overrides.geojson';
@@ -252,7 +259,7 @@ async function ensureLoaded(): Promise<void> {
     if (typeof fetch !== 'function') return;
 
     try {
-      const response = await fetch(COUNTRY_GEOJSON_URL);
+      const response = await fetch(getCountryGeojsonUrl());
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }

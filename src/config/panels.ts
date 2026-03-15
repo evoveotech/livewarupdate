@@ -1,5 +1,6 @@
 import type { PanelConfig, MapLayers, DataSourceId } from '@/types';
 import { SITE_VARIANT } from './variant';
+import { BRAND } from './brand';
 // boundary-ignore: isDesktopRuntime is a pure env probe with no service dependencies
 import { isDesktopRuntime } from '@/services/runtime';
 
@@ -801,13 +802,19 @@ const COMMODITY_MOBILE_MAP_LAYERS: MapLayers = {
   webcams: false,
 };
 
+// Filter github panel when showGitHubLinks is false (private/proprietary look)
+function filterGitHubPanels<T extends Record<string, PanelConfig>>(panels: T): T {
+  if (BRAND.showGitHubLinks) return panels;
+  return Object.fromEntries(Object.entries(panels).filter(([k]) => k !== 'github')) as T;
+}
+
 // ============================================
 // VARIANT-AWARE EXPORTS
 // ============================================
 export const DEFAULT_PANELS = SITE_VARIANT === 'happy' 
   ? HAPPY_PANELS 
   : SITE_VARIANT === 'tech' 
-    ? TECH_PANELS 
+    ? filterGitHubPanels(TECH_PANELS) 
     : SITE_VARIANT === 'finance' 
       ? FINANCE_PANELS 
       : SITE_VARIANT === 'commodity'
@@ -897,7 +904,9 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
   // Tech variant
   techAi: {
     labelKey: 'header.panelCatTechAi',
-    panelKeys: ['ai', 'tech', 'hardware', 'cloud', 'dev', 'github', 'producthunt', 'events', 'service-status', 'tech-readiness'],
+    panelKeys: BRAND.showGitHubLinks
+      ? ['ai', 'tech', 'hardware', 'cloud', 'dev', 'github', 'producthunt', 'events', 'service-status', 'tech-readiness']
+      : ['ai', 'tech', 'hardware', 'cloud', 'dev', 'producthunt', 'events', 'service-status', 'tech-readiness'],
     variants: ['tech'],
   },
   startupsVc: {

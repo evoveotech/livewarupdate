@@ -12,7 +12,15 @@ interface StoryMeta {
 }
 
 const variantMeta = VARIANT_META[SITE_VARIANT] ?? VARIANT_META.full;
-const BASE_URL = variantMeta.url.replace(/\/$/, '');
+// On custom domain or localhost, use current origin; else use variant-specific URL
+function getBaseUrl(): string {
+  if (typeof window === 'undefined') return variantMeta.url.replace(/\/$/, '');
+  const h = location.hostname;
+  const isWM = h === 'worldmonitor.app' || h === 'www.worldmonitor.app' || h.endsWith('.worldmonitor.app');
+  if (isWM) return variantMeta.url.replace(/\/$/, '');
+  return `${location.origin}`;
+}
+const BASE_URL = getBaseUrl();
 const API_ORIGIN = getCanonicalApiOrigin();
 const DEFAULT_IMAGE = `${BASE_URL}/favico/${SITE_VARIANT === 'full' ? '' : SITE_VARIANT + '/'}og-image.png`;
 

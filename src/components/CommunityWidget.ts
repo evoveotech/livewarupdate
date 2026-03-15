@@ -1,10 +1,12 @@
 import { t } from '@/services/i18n';
 import { getDismissed, setDismissed } from '@/utils/cross-domain-storage';
+import { BRAND } from '@/config/brand';
 
 const DISMISSED_KEY = 'wm-community-dismissed';
 const DISCUSSION_URL = 'https://github.com/koala73/worldmonitor/discussions/94';
 
 export function mountCommunityWidget(): void {
+  if (!BRAND.showGitHubLinks) return;
   if (getDismissed(DISMISSED_KEY)) return;
   if (document.querySelector('.community-widget')) return;
 

@@ -291,7 +291,7 @@ window.addEventListener('unhandledrejection', (e) => {
 
 import { debugGetCells, getCellCount } from '@/services/geo-convergence';
 import { initMetaTags } from '@/services/meta-tags';
-import { installRuntimeFetchPatch, installWebApiRedirect } from '@/services/runtime';
+import { installRuntimeFetchPatch, installWebApiRedirect, installCustomDomainApiFallback } from '@/services/runtime';
 import { loadDesktopSecrets } from '@/services/runtime-config';
 import { applyStoredTheme } from '@/utils/theme-manager';
 import { applyFont } from '@/services/font-settings';
@@ -301,10 +301,13 @@ import { clearChunkReloadGuard, installChunkReloadGuard } from '@/bootstrap/chun
 // Auto-reload on stale chunk 404s after deployment (Vite fires this for modulepreload failures).
 const chunkReloadStorageKey = installChunkReloadGuard(__APP_VERSION__);
 
-// Initialize Vercel Analytics (10% sampling to reduce costs)
-inject({
-  beforeSend: (event) => (Math.random() > 0.1 ? null : event),
-});
+// Initialize Vercel Analytics only on Vercel/WorldMonitor hosts (avoids 404 on custom domains)
+const host = location.hostname;
+if (host.includes('vercel.app') || host === 'worldmonitor.app' || host === 'www.worldmonitor.app' || host.endsWith('.worldmonitor.app')) {
+  inject({
+    beforeSend: (event) => (Math.random() > 0.1 ? null : event),
+  });
+}
 
 // Initialize dynamic meta tags for sharing
 initMetaTags();
@@ -313,6 +316,8 @@ initMetaTags();
 installRuntimeFetchPatch();
 // In web production, route RPC calls through api.worldmonitor.app (Cloudflare edge).
 installWebApiRedirect();
+// Custom domain/localhost: try same-origin API first, fallback to api.worldmonitor.app on 404/fail.
+installCustomDomainApiFallback();
 loadDesktopSecrets().catch(() => {});
 
 // Apply stored theme preference before app initialization (safety net for inline script)

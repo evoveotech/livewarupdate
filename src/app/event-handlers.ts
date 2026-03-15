@@ -30,7 +30,7 @@ import {
   DEFAULT_PANELS,
 } from '@/config';
 import { VARIANT_META } from '@/config/variant-meta';
-import { isDesktopRuntime } from '@/services/runtime';
+import { isDesktopRuntime, isWorldMonitorWebHost } from '@/services/runtime';
 import {
   saveSnapshot,
   initAisStream,
@@ -342,7 +342,7 @@ export class EventHandlerManager implements AppModule {
     };
     document.addEventListener('keydown', this.boundUndoHandler);
 
-    const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const useInternalVariant = this.ctx.isDesktopApp || location.hostname === 'localhost' || location.hostname === '127.0.0.1' || !isWorldMonitorWebHost(location.hostname);
     this.ctx.container.querySelectorAll<HTMLAnchorElement>('.variant-option').forEach(link => {
       link.addEventListener('click', (e) => {
         const variant = link.dataset.variant;
@@ -350,7 +350,7 @@ export class EventHandlerManager implements AppModule {
         e.preventDefault();
         void this.navigateToVariant(variant, {
           href: link.href,
-          isLocalDev,
+          useInternal: useInternalVariant,
         });
       });
     });
@@ -451,12 +451,12 @@ export class EventHandlerManager implements AppModule {
     overlay.addEventListener('click', () => this.closeMobileMenu());
     closeBtn.addEventListener('click', () => this.closeMobileMenu());
 
-    const isLocalDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const useInternalVariant = this.ctx.isDesktopApp || location.hostname === 'localhost' || location.hostname === '127.0.0.1' || !isWorldMonitorWebHost(location.hostname);
     menu.querySelectorAll<HTMLButtonElement>('.mobile-menu-variant').forEach(btn => {
       btn.addEventListener('click', () => {
         const variant = btn.dataset.variant;
         if (!variant || variant === SITE_VARIANT) return;
-        void this.navigateToVariant(variant, { isLocalDev });
+        void this.navigateToVariant(variant, { useInternal: useInternalVariant });
       });
     });
 
@@ -606,6 +606,7 @@ export class EventHandlerManager implements AppModule {
     const baseUrl = `${window.location.origin}${window.location.pathname}`;
     const briefPage = this.ctx.countryBriefPage;
     const isCountryVisible = briefPage?.isVisible() ?? false;
+    const useVariantInUrl = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || !isWorldMonitorWebHost(location.hostname);
     return buildMapUrl(baseUrl, {
       view: state.view,
       zoom: state.zoom,
@@ -614,6 +615,7 @@ export class EventHandlerManager implements AppModule {
       layers: state.layers,
       country: isCountryVisible ? (briefPage?.getCode() ?? undefined) : undefined,
       expanded: isCountryVisible && briefPage?.getIsMaximized?.() ? true : undefined,
+      variant: useVariantInUrl ? SITE_VARIANT : undefined,
     });
   }
 
@@ -758,12 +760,12 @@ export class EventHandlerManager implements AppModule {
 
   private async navigateToVariant(
     variant: string,
-    options: { href?: string; isLocalDev: boolean },
+    options: { href?: string; useInternal: boolean },
   ): Promise<void> {
     trackVariantSwitch(SITE_VARIANT, variant);
     await this.exitFullscreenForNavigation();
 
-    if (this.ctx.isDesktopApp || options.isLocalDev) {
+    if (this.ctx.isDesktopApp || options.useInternal) {
       localStorage.setItem('worldmonitor-variant', variant);
       window.location.reload();
       return;

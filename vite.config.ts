@@ -73,6 +73,26 @@ function htmlVariantPlugin(): Plugin {
         .replace(/<h1>World Monitor — Real-Time Global Intelligence Dashboard<\/h1>/, `<h1>${activeMeta.siteName} — Real-Time Global Intelligence Dashboard</h1>`)
         .replace(/<p><a href="https:\/\/www\.worldmonitor\.app\/pro"[^>]*>Upgrade to World Monitor Pro<\/a><\/p>/, BRAND.showProLinks ? `<p><a href="https://www.worldmonitor.app/pro" style="color:#4ade80;">Upgrade to ${activeMeta.siteName} Pro</a></p>` : '');
 
+      // Private/proprietary look: remove GitHub from JSON-LD when showGitHubLinks is false
+      if (!BRAND.showGitHubLinks) {
+        result = result
+          .replace(/"sameAs": \["https:\/\/x\.com\/eliehabib", "https:\/\/github\.com\/koala73"\]/, '"sameAs": ["https://x.com/eliehabib"]')
+          .replace(/"https:\/\/github\.com\/koala73\/worldmonitor",\s*/, '')
+          .replace(/,\s*"https:\/\/github\.com\/koala73\/worldmonitor"/, '');
+      }
+
+      // Custom domain: replace all worldmonitor.app URLs with BRAND.siteUrl
+      if (BRAND.siteUrl) {
+        const base = BRAND.siteUrl.replace(/\/$/, '');
+        result = result
+          .replace(/https:\/\/www\.worldmonitor\.app/g, base)
+          .replace(/https:\/\/worldmonitor\.app/g, base)
+          .replace(/https:\/\/tech\.worldmonitor\.app/g, base)
+          .replace(/https:\/\/finance\.worldmonitor\.app/g, base)
+          .replace(/https:\/\/commodity\.worldmonitor\.app/g, base)
+          .replace(/https:\/\/happy\.worldmonitor\.app/g, base);
+      }
+
       // Theme-color meta — warm cream for happy variant
       if (activeVariant === 'happy') {
         result = result.replace(
@@ -606,6 +626,71 @@ function gpsjamDevPlugin(): Plugin {
   };
 }
 
+const API_WORLDMONITOR_ORIGIN = 'https://api.worldmonitor.app';
+
+/**
+ * Proxy unhandled /api/* routes to api.worldmonitor.app in dev.
+ * Handles bootstrap, countries-geojson, telegram-feed, etc. that are not
+ * covered by sebuf, polymarket, rss-proxy, youtube, or gpsjam plugins.
+ */
+function apiWorldmonitorProxyPlugin(): Plugin {
+  return {
+    name: 'api-worldmonitor-proxy',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith('/api/')) return next();
+        // sebuf handles /api/{domain}/v1/*; other plugins handle specific paths
+        if (/^\/api\/[a-z-]+\/v1\//.test(req.url)) return next();
+        if (req.url.startsWith('/api/polymarket')) return next();
+        if (req.url.startsWith('/api/rss-proxy')) return next();
+        if (req.url.startsWith('/api/youtube/')) return next();
+        if (req.url === '/api/gpsjam' || req.url.startsWith('/api/gpsjam?')) return next();
+
+        const targetUrl = `${API_WORLDMONITOR_ORIGIN}${req.url}`;
+        try {
+          const headers: Record<string, string> = {};
+          for (const [k, v] of Object.entries(req.headers)) {
+            if (v && typeof v === 'string' && !['host', 'connection'].includes(k.toLowerCase())) {
+              headers[k] = v;
+            }
+          }
+          headers['Host'] = 'api.worldmonitor.app';
+
+          let body: string | undefined;
+          if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) {
+              chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+            }
+            body = Buffer.concat(chunks).toString();
+          }
+
+          const proxyRes = await fetch(targetUrl, {
+            method: req.method,
+            headers,
+            body,
+            redirect: 'follow',
+          });
+
+          res.statusCode = proxyRes.status;
+          proxyRes.headers.forEach((v, k) => {
+            if (!['content-encoding', 'transfer-encoding'].includes(k.toLowerCase())) {
+              res.setHeader(k, v);
+            }
+          });
+          res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+          res.end(await proxyRes.text());
+        } catch (err) {
+          console.error('[api-worldmonitor-proxy]', req.url, err);
+          res.statusCode = 502;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'API proxy failed' }));
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -617,6 +702,7 @@ export default defineConfig({
     youtubeLivePlugin(),
     gpsjamDevPlugin(),
     sebufApiPlugin(),
+    apiWorldmonitorProxyPlugin(),
     brotliPrecompressPlugin(),
     VitePWA({
       registerType: 'autoUpdate',

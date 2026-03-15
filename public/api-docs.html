@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Reference — World Monitor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.11.0/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js"></script>
+  <script>
+    (function () {
+      const base = window.location.origin;
+      const urls = [
+        { url: base + '/openapi/core-endpoints.openapi.json', name: 'Core (bootstrap, RSS, health, geo)' },
+        { url: base + '/openapi/ConflictService.openapi.json', name: 'Conflict' },
+        { url: base + '/openapi/MilitaryService.openapi.json', name: 'Military' },
+        { url: base + '/openapi/UnrestService.openapi.json', name: 'Unrest' },
+        { url: base + '/openapi/IntelligenceService.openapi.json', name: 'Intelligence' },
+        { url: base + '/openapi/DisplacementService.openapi.json', name: 'Displacement' },
+        { url: base + '/openapi/CyberService.openapi.json', name: 'Cyber' },
+        { url: base + '/openapi/NaturalService.openapi.json', name: 'Natural' },
+        { url: base + '/openapi/SeismologyService.openapi.json', name: 'Seismology' },
+        { url: base + '/openapi/ClimateService.openapi.json', name: 'Climate' },
+        { url: base + '/openapi/WildfireService.openapi.json', name: 'Wildfire' },
+        { url: base + '/openapi/EconomicService.openapi.json', name: 'Economic' },
+        { url: base + '/openapi/MarketService.openapi.json', name: 'Market' },
+        { url: base + '/openapi/TradeService.openapi.json', name: 'Trade' },
+        { url: base + '/openapi/SupplyChainService.openapi.json', name: 'Supply Chain' },
+        { url: base + '/openapi/PredictionService.openapi.json', name: 'Prediction' },
+        { url: base + '/openapi/AviationService.openapi.json', name: 'Aviation' },
+        { url: base + '/openapi/MaritimeService.openapi.json', name: 'Maritime' },
+        { url: base + '/openapi/InfrastructureService.openapi.json', name: 'Infrastructure' },
+        { url: base + '/openapi/NewsService.openapi.json', name: 'News' },
+        { url: base + '/openapi/ResearchService.openapi.json', name: 'Research' },
+        { url: base + '/openapi/PositiveEventsService.openapi.json', name: 'Positive Events' },
+        { url: base + '/openapi/GivingService.openapi.json', name: 'Giving' },
+        { url: base + '/openapi/ForecastService.openapi.json', name: 'Forecast' },
+        { url: base + '/openapi/ImageryService.openapi.json', name: 'Imagery' },
+        { url: base + '/openapi/WebcamService.openapi.json', name: 'Webcam' }
+      ];
+      window.onload = function () {
+        window.ui = SwaggerUIBundle({
+          urls: urls,
+          dom_id: '#swagger-ui',
+          deepLinking: true,
+          presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.SwaggerUIStandalonePreset
+          ],
+          layout: 'StandaloneLayout',
+          persistAuthorization: true,
+          tryItOutEnabled: true
+        });
+      };
+    })();
+  </script>
+</body>
+</html>
